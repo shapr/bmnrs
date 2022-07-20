@@ -64,9 +64,10 @@ fn main() {
 	cards.push_back(0);
     }
 
-    let g3895 = read_game("----K-JA---K---KQ--J-----K-", "-----A--J-J--Q--A---A-Q-Q");
+    let mut g3895 = read_game("----K-JA---K---KQ--J-----K-", "-----A--J-J--Q--A---A-Q-Q");
     // assert_eq!(play_some_pieces(g3895).steps, 3895);
-    assert_eq!(play_some(g3895).steps, 3895);
+    play_some_pieces(&mut g3895);
+    assert_eq!(g3895.steps, 3895);
     play_some_many(cards);
 }
 
@@ -82,20 +83,20 @@ fn play_some_many(cards: VecDeque<u8>) {
 	let mut newcards = cards.clone(); // [TODO] copy into instead?
 	// rng.shuffle(&mut newcards.make_contiguous());
 	fastrand::shuffle(&mut newcards.make_contiguous());
-	let game = deal(newcards.clone(), false);
+	let mut game = deal(newcards.clone(), false);
 	// let this_game = play_some_pieces(game);
-	let this_game = play_some(game);
-	if this_game.steps > highscore {
-	    highscore = this_game.steps;
-	    best_game = this_game;
+	play_some_pieces(&mut game);
+	if game.steps > highscore {
+	    highscore = game.steps;
+	    best_game = game;
 	    println!("{}", best_game);
 	}
-	let game2 = deal(newcards, true);
-	let other_game = play_some(game2);
+	let mut game2 = deal(newcards, true);
+	play_some_pieces(&mut game2);
 	counter += 2;
-	if other_game.steps > highscore {
-	    highscore = other_game.steps;
-	    best_game = other_game;
+	if game2.steps > highscore {
+	    highscore = game2.steps;
+	    best_game = game2;
 	    println!("p2 {}", best_game);
 	}
 	if counter % 30000000 == 0 {
@@ -115,38 +116,6 @@ fn play_some_many(cards: VecDeque<u8>) {
 }
 
 
-fn play_some(mut g: Game) -> Game {
-    while let Some(card) = g.get_active_mut().pop_front() {
-	g.steps += 1; // add one to steps
-	if card > 0 { // is this next card a penalty card?
-	    g.p1control = !g.p1control; // change active player
-	    g.penalty = card; // set the new penalty value
-	    g.pot.push_back(card); // add this card to the front of the pot
-	} else {
-	    // it's not a penalty card, but we still have tribute to pay
-	    if g.penalty > 0 {
-		// penalty is active, and this is not a penalty card
-		g.pot.push_back(card); // put this card in the pot
-		g.penalty -= 1; // subtract one from penalty
-		if g.penalty == 0 {
-		    // battle is done, add pot to the non-active player's hand
-		    if g.p1control {
-			g.p2hand.append(&mut g.pot);
-		    } else {
-			g.p1hand.append(&mut g.pot);
-		    }
-		    g.p1control = !g.p1control; // winner is now active player
-		}
-	    } else {
-		// nothing going on, play a card into the pot
-		g.pot.push_back(card);
-		g.p1control = !g.p1control;
-	    }
-	}
-    }
-    return g;
-}
-
 impl Game {
     fn get_active_mut(&mut self) -> &mut VecDeque<u8> {
 	if self.p1control {
@@ -157,108 +126,53 @@ impl Game {
     }
 }
 
-// impl Game {  // the what?
-//     fn get_inactive_mut(&mut self) -> &mut VecDeque<u8> {
-//	if self.p1control {
-//	    &mut self.p2hand
-//	} else {
-//	    &mut self.p1hand
-//	}
-//     }
-// }
+fn play_some_pieces(g: &mut Game){
+    while let Some(card) = g.get_active_mut().pop_front() {
+	g.steps += 1; // add one to steps
+	if card > 0 {
+	    // is this next card a penalty card?
+	    penalty_card(g, card);
+	} else {
+	    // it's not a penalty card, but we still have tribute to pay
+	    if g.penalty > 0 {
+		no_penalty_card(g, card);
+	    } else {
+		// nothing going on, play a card into the pot
+		boring_card(g, card);
+	    }
+	}
+    }
+}
 
-// fn play_frequent(mut g: Game) -> Game {
-//     while let Some(card) = g.get_active_mut().pop_front() {
-//	g.steps += 1; // add one to steps
-//	if card == 0 {
-//	    if g.penalty > 0 {
-//		// penalty is active, and this is not a penalty card
-//		g.pot.push_back(card); // put this card in the pot
-//		g.penalty -= 1; // subtract one from penalty
-//		if g.penalty == 0 {
-//		    // battle is done, add pot to the non-active player's hand
-//		    if g.p1control {
-//			g.p2hand.append(&mut g.pot);
-//		    } else {
-//			g.p1hand.append(&mut g.pot);
-//		    }
-//		    g.p1control = !g.p1control; // winner is now active player
-//		}
-//	    } else {
-//		// nothing going on, play a card into the pot
-//		g.pot.push_back(card);
-//		g.p1control = !g.p1control;
-//	    }
-//	} else { // it's a penalty card
-//	    g.p1control = !g.p1control; // change active player
-//	    g.penalty = card; // set the new penalty value
-//	    g.pot.push_back(card); // add this card to the front of the pot
-//	}
-//     }
-//     return g;
-// }
+fn penalty_card(g: &mut Game, card: u8) {
+    g.p1control ^= true;
+    g.penalty = card; // set the new penalty value
+    g.pot.push_back(card); // add this card to the front of the pot
+}
 
-// fn play_some_pieces(mut g: Game) -> Game {
-//     // coz::begin!("play_some_pieces");
-//     while let Some(card) = g.get_active_mut().pop_front() {
-//	// coz::progress!();
-//	g.steps += 1; // add one to steps
-//	if card > 0 {
-//	    // is this next card a penalty card?
-//	    g = penalty_card(g, card);
-//	} else {
-//	    // it's not a penalty card, but we still have tribute to pay
-//	    if g.penalty > 0 {
-//		g = no_penalty_card(g, card);
-//	    } else {
-//		// nothing going on, play a card into the pot
-//		g = boring_card(g, card);
-//	    }
-//	}
-//     }
-//     // coz::end!("play_some_pieces");
-//     return g;
-// }
+fn no_penalty_card(g: &mut Game, card: u8) {
+    // penalty is active, and this is not a penalty card
+    g.pot.push_back(card); // put this card in the pot
+    g.penalty -= 1; // subtract one from penalty
+    if g.penalty == 0 {
+	// battle is done, add pot to the non-active player's hand
+	if g.p1control {
+	    g.p2hand.append(&mut g.pot);
+	} else {
+	    g.p1hand.append(&mut g.pot);
+	}
+	g.p1control ^= true; // invert p1control, winner is now active player
+    }
+}
 
-// fn penalty_card(mut g: Game, card: u8) -> Game {
-//     // coz::begin!("penalty_card");
-//     g.p1control ^= true;
-//     // g.p1control = !g.p1control; // change active player
-//     g.penalty = card; // set the new penalty value
-//     g.pot.push_back(card); // add this card to the front of the pot
-//     // coz::end!("penalty_card");
-//     return g;
-// }
-
-// fn no_penalty_card(mut g: Game, card: u8) -> Game {
-//     // penalty is active, and this is not a penalty card
-//     // coz::begin!("no_penalty_card");
-//     g.pot.push_back(card); // put this card in the pot
-//     g.penalty -= 1; // subtract one from penalty
-//     if g.penalty == 0 {
-//	// battle is done, add pot to the non-active player's hand
-//	if g.p1control {
-//	    g.p2hand.append(&mut g.pot);
-//	} else {
-//	    g.p1hand.append(&mut g.pot);
-//	}
-//	g.p1control ^= true; // invert p1control, winner is now active player
-//     }
-//     // coz::end!("no_penalty_card");
-//     return g;
-// }
-// fn boring_card(mut g: Game, card: u8) -> Game {
-//     // coz::begin!("boring_card");
-//     g.pot.push_back(card);
-//     // g.p1control = !g.p1control;
-//     g.p1control ^= true;
-//     // coz::end!("boring_card");
-//     return g;
-// }
+fn boring_card(g: &mut Game, card: u8) {
+    g.pot.push_back(card);
+    g.p1control ^= true;
+}
 
 fn deal(mut cards: VecDeque<u8>, swap: bool) -> Game {
-    let mut deal1: VecDeque<u8> = VecDeque::with_capacity(32);
-    let mut deal2: VecDeque<u8> = VecDeque::with_capacity(32);
+    let mut deal1: VecDeque<u8> = VecDeque::with_capacity(64);
+    let mut deal2: VecDeque<u8> = VecDeque::with_capacity(64);
     if swap {
 	deal2.append(&mut cards.split_off(25)); // first 26 cards dealt to p1
 	deal1.append(&mut cards); // last 26 cards dealt to p2
@@ -275,7 +189,7 @@ fn make_game(deal1: VecDeque<u8>, deal2: VecDeque<u8>) -> Game {
 	p2deal: deal2.clone(),
 	p1hand: deal1,
 	p2hand: deal2,
-	pot: VecDeque::with_capacity(32),
+	pot: VecDeque::with_capacity(64),
 	p1control: true,
 	penalty: 0,
 	steps: 0,
