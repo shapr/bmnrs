@@ -1,5 +1,5 @@
- use fastrand;
-//use rand::Rng;
+// use fastrand;
+use rand::Rng;
 use std::collections::VecDeque;
 use std::fmt;
 use std::time::Instant;
@@ -27,6 +27,11 @@ fn read_game(p1: &str, p2: &str) -> Game {
     let p1deal: VecDeque<u8> = p1.chars().map(read_card).collect();
     let p2deal: VecDeque<u8> = p2.chars().map(read_card).collect();
     return make_game(p1deal, p2deal);
+}
+
+fn read_deck(d: &str) -> Game {
+    let deck: VecDeque<u8> = d.chars().map(read_card).collect();
+    return deal(deck, true);
 }
 
 fn read_card(c: char) -> u8 {
@@ -63,6 +68,11 @@ fn main() {
     for _c in 0..36 {
 	cards.push_back(0);
     }
+    // let mut g8344 = read_deck("---AJ--Q---------QAKQJJ-QK-----A----KJ-K--------A---");
+    // let mut g8344 = read_game("---AJ--Q---------QAKQJJ-QK", "-----A----KJ-K--------A---");
+
+    // play_some_pieces(&mut g8344);
+    // println!("{} from g8344", g8344);
 
     let mut g3895 = read_game("----K-JA---K---KQ--J-----K-", "-----A--J-J--Q--A---A-Q-Q");
     // assert_eq!(play_some_pieces(g3895).steps, 3895);
@@ -77,12 +87,12 @@ fn play_some_many(cards: VecDeque<u8>) {
     let mut highscore = 0;
     let mut best_game = deal(cards.clone(), false);
     let start = Instant::now();
-    // let mut rng = rand::thread_rng();
+    let mut rng = rand::thread_rng();
 
     loop {
 	let mut newcards = cards.clone(); // [TODO] copy into instead?
-	// rng.shuffle(&mut newcards.make_contiguous());
-	fastrand::shuffle(&mut newcards.make_contiguous());
+	rng.shuffle(&mut newcards.make_contiguous());
+	// fastrand::shuffle(&mut newcards.make_contiguous());
 	let mut game = deal(newcards.clone(), false);
 	// let this_game = play_some_pieces(game);
 	play_some_pieces(&mut game);
@@ -115,7 +125,6 @@ fn play_some_many(cards: VecDeque<u8>) {
     }
 }
 
-
 impl Game {
     fn get_active_mut(&mut self) -> &mut VecDeque<u8> {
 	if self.p1control {
@@ -126,7 +135,7 @@ impl Game {
     }
 }
 
-fn play_some_pieces(g: &mut Game){
+fn play_some_pieces(g: &mut Game) {
     while let Some(card) = g.get_active_mut().pop_front() {
 	g.steps += 1; // add one to steps
 	if card > 0 {
@@ -174,13 +183,15 @@ fn deal(mut cards: VecDeque<u8>, swap: bool) -> Game {
     let mut deal1: VecDeque<u8> = VecDeque::with_capacity(64);
     let mut deal2: VecDeque<u8> = VecDeque::with_capacity(64);
     if swap {
-	deal2.append(&mut cards.split_off(25)); // first 26 cards dealt to p1
-	deal1.append(&mut cards); // last 26 cards dealt to p2
+	deal2.append(&mut cards.split_off(25)); // first 26 cards dealt to p2
+	deal1.append(&mut cards); // last 26 cards dealt to p1
     } else {
 	deal1.append(&mut cards.split_off(25)); // first 26 cards dealt to p1
 	deal2.append(&mut cards); // last 26 cards dealt to p2
     }
-    return make_game(deal1, deal2);
+    let g = make_game(deal1, deal2);
+    // println!("deal created {}", g);
+    return g;
 }
 
 fn make_game(deal1: VecDeque<u8>, deal2: VecDeque<u8>) -> Game {

@@ -1,13 +1,13 @@
 [package]
 name = "strip-jack-naked"
-version = "1.1.5"
+version = "1.1.7"
 authors = ["Shae Erisson <shae@scannedinavian.com>"]
 edition = "2021"
 
 [dependencies]
-#rand = "0.3"
+rand = "0.3"
 #coz = "0.1"
-fastrand = "1.7.0"
+#fastrand = "1.7.0"
 
 [profile.release]
 #debug = true
