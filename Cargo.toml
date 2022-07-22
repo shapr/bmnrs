@@ -1,6 +1,6 @@
 [package]
 name = "strip-jack-naked"
-version = "1.1.7"
+version = "1.2.7"
 authors = ["Shae Erisson <shae@scannedinavian.com>"]
 edition = "2021"
 
@@ -12,3 +12,4 @@ rand = "0.3"
 [profile.release]
 #debug = true
 lto = true
+panic = "abort"
