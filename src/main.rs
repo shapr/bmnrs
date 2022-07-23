@@ -58,7 +58,23 @@ fn play_many(cards: VecDeque<u8>) {
                 best_game = p2g;
                 println!("{}", best_game);
             }
-            counter += 2;
+            let p1gr_deal = c.clone().into_iter().rev().collect();
+            let mut p1gr = deal(p1gr_deal, false);
+            play_one(&mut p1gr);
+            if p1gr.steps > highscore {
+                highscore = p1gr.steps;
+                best_game = p1gr;
+                println!("{}", best_game);
+            }
+            let p2gr_deal = c.clone().into_iter().rev().collect();
+            let mut p2gr = deal(p2gr_deal, true);
+            play_one(&mut p2gr);
+            if p2gr.steps > highscore {
+                highscore = p2gr.steps;
+                best_game = p2gr;
+                println!("{}", best_game);
+            }
+            counter += 4;
         }
         if counter % 1000000 == 0 {
             println!(
