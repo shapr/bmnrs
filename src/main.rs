@@ -14,10 +14,11 @@ fn main() {
     for _c in 0..36 {
         cards.push_back(0); // 36 cards that don't matter
     }
-
-    let mut g8344 = read_game("---AJ--Q---------QAKQJJ-QK", "-----A----KJ-K--------A---");
-    play_one(&mut g8344);
-    assert_eq!(g8344.steps, 8345); // sanity check, convert to test?
+    {
+        let mut g8344 = read_game("---AJ--Q---------QAKQJJ-QK", "-----A----KJ-K--------A---");
+        play_one(&mut g8344);
+        assert_eq!(g8344.steps, 8345); // sanity check, convert to test?
+    }
     play_many(cards);
 }
 
@@ -36,10 +37,6 @@ fn play_many(cards: VecDeque<u8>) {
             let mut c = newcards.clone();
             c.rotate_right(r);
             let mut p1g = deal(c.clone(), false);
-            // let p1_penaltycount = count_penalty_cards(&p1g.p1deal);
-            // if p1_penaltycount < 4 || p1_penaltycount > 12 {
-            //	continue;
-            // }
             let p1sum = sum_penalty_cards(&p1g.p1deal);
             if p1sum > 27 || p1sum < 13 {
                 // seems to work for the leader board?
@@ -170,7 +167,6 @@ fn sum_penalty_cards(vd: &VecDeque<u8>) -> u8 {
 }
 
 fn deal(mut cards: VecDeque<u8>, swap: bool) -> Game {
-    // assert_eq!(cards.len(),52);
     let mut deal1: VecDeque<u8> = VecDeque::with_capacity(64);
     let mut deal2: VecDeque<u8> = VecDeque::with_capacity(64);
     if swap {
@@ -180,12 +176,7 @@ fn deal(mut cards: VecDeque<u8>, swap: bool) -> Game {
         deal1.append(&mut cards.split_off(26)); // first 26 cards dealt to p1
         deal2.append(&mut cards); // last 26 cards dealt to p2
     }
-    // crap out and die if I screwed it up
-    // assert_eq!(deal1.len(),26,"swap is {} and deal1 was {} which is WRONG",swap, deal1.len());
-    // assert_eq!(deal2.len(),26,"swap is {} and deal2 was {} which is WRONG",swap, deal2.len());
-    let g = make_game(deal1, deal2);
-    // println!("deal created {}", g);
-    return g;
+    return make_game(deal1, deal2);
 }
 
 fn make_game(deal1: VecDeque<u8>, deal2: VecDeque<u8>) -> Game {
