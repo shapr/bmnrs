@@ -15,10 +15,13 @@ fn main() {
         cards.push_back(0); // 36 cards that don't matter
     }
     {
+        // let mut test_game = read_game("-Q-Q-----JJ-K-----K-A--AKK", "---J-------A-----Q--J-A-Q-");
         let mut g8344 = read_game("---AJ--Q---------QAKQJJ-QK", "-----A----KJ-K--------A---");
         play_one(&mut g8344);
         assert_eq!(g8344.steps, 8345); // sanity check, convert to test?
     }
+    // let unplay_game = read_game("-----K-A--AKK--Q---JQ------------JAJ---K---", "Q--J-A-Q-");
+    // println!("{}",unplay_game);
     play_many(cards);
 }
 
@@ -38,7 +41,7 @@ fn play_many(cards: VecDeque<u8>) {
             c.rotate_right(r);
             let mut p1g = deal(c.clone(), false);
             let p1sum = sum_penalty_cards(&p1g.p1deal);
-            if p1sum > 27 || p1sum < 13 {
+            if p1sum > 28 || p1sum < 12 {
                 // seems to work for the leader board?
                 continue;
             }
@@ -76,17 +79,23 @@ fn play_many(cards: VecDeque<u8>) {
 fn play_one(g: &mut Game) {
     while let Some(card) = g.get_active_mut().pop_front() {
         g.steps += 1; // add one to steps
+        if g.steps > 8500 {
+            break; // this is a record breaker
+        }
         if card > 0 {
             // is this next card a penalty card?
             g.penalty = card;
             boring_card(g, card);
+            // print_internal_state(g);
         } else {
             // it's not a penalty card, but we still have tribute to pay
             if g.penalty > 0 {
                 pay_tribute(g, card);
+            // print_internal_state(g);
             } else {
                 // nothing going on, play a card into the pot
                 boring_card(g, card);
+                // print_internal_state(g);
             }
         }
     }
@@ -201,3 +210,12 @@ impl Game {
         }
     }
 }
+
+// fn print_internal_state(g : &mut Game) {
+//     let p1: String = g.p1hand.iter().map(show_card).collect();
+//     let p2: String = g.p2hand.iter().map(show_card).collect();
+//     let pot: String = g.pot.iter().map(show_card).collect();
+//     // let tenth_sec = time::Duration::from_millis(100);
+//     // thread::sleep(tenth_sec);
+//     println!("{}                         {}                         {}",p1,pot, p2);
+// }
