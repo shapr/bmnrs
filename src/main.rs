@@ -40,11 +40,15 @@ fn play_many(cards: Vec<u8>) {
             let mut c = newcards.clone();
             c.rotate_right(r);
             let mut p1g = deal(c.clone(), false);
-            let p1sum = sum_penalty_cards(&p1g.p1deal);
-            if p1sum > 28 || p1sum < 12 {
-                // seems to work for the leader board?
+            let p1_pen_card_count = count_penalty_cards(&p1g.p1deal);
+            if p1_pen_card_count > 11 || p1_pen_card_count < 5 {
                 continue;
             }
+            // let p1sum = sum_penalty_cards(&p1g.p1deal);
+            // if p1sum > 28 || p1sum < 12 {
+            //	// seems to work for the leader board?
+            //	continue;
+            // }
             play_one(&mut p1g.game);
             if p1g.game.steps > highscore {
                 highscore = p1g.game.steps;
@@ -191,6 +195,10 @@ fn sum_penalty_cards(vd: &Vec<u8>) -> u8 {
     return vd.iter().sum();
 }
 
+fn count_penalty_cards(vd: &Vec<u8>) -> u8 {
+    return vd.into_iter().filter(|x| **x > 0).count() as u8;
+}
+
 fn deal(mut cards: Vec<u8>, swap: bool) -> GameState {
     let mut deal1: Vec<u8> = Vec::with_capacity(64);
     let mut deal2: Vec<u8> = Vec::with_capacity(64);
@@ -225,6 +233,7 @@ impl Game {
         swap(&mut self.p1hand, &mut self.p2hand);
     }
 }
+
 // fn print_internal_state(g : &mut Game) {
 //     let p1: String = g.p1hand.iter().map(show_card).collect();
 //     let p2: String = g.p2hand.iter().map(show_card).collect();

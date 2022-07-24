@@ -63,7 +63,7 @@ dependencies = [
 
 [[package]]
 name = "strip-jack-naked"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "rand 0.3.23",
 ]
