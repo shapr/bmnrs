@@ -11,5 +11,5 @@ rand = "0.3"
 #debug = true
 codegen-units = 1
 lto = "fat"
-opt-level = 3
+#opt-level = 3
 panic = "abort"

@@ -29,6 +29,7 @@ fn play_many(cards: Vec<u8>) {
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     let mut counter = 0;
     let mut highscore = 0;
+    // let mut best_games: Vec<GameState> = vec![];
     let mut best_game = deal(cards.clone(), false);
     let start = Instant::now();
     let mut rng = rand::thread_rng();
@@ -42,24 +43,21 @@ fn play_many(cards: Vec<u8>) {
             let mut p1g = deal(c.clone(), false);
             let p1_pen_card_count = count_penalty_cards(&p1g.p1deal);
             if p1_pen_card_count > 11 || p1_pen_card_count < 5 {
-                continue;
+                continue; // world record decks have no more than 11 and no less than 5 penalty cards
             }
-            // let p1sum = sum_penalty_cards(&p1g.p1deal);
-            // if p1sum > 28 || p1sum < 12 {
-            //	// seems to work for the leader board?
-            //	continue;
-            // }
             play_one(&mut p1g.game);
             if p1g.game.steps > highscore {
                 highscore = p1g.game.steps;
                 best_game = p1g;
+                // best_games.push(p1g);
                 println!("{}", best_game);
             }
-            let mut p2g = deal(c.clone(), false);
+            let mut p2g = deal(c.clone(), true);
             play_one(&mut p2g.game);
             if p2g.game.steps > highscore {
                 highscore = p2g.game.steps;
                 best_game = p2g;
+                // best_games.push(p2g);
                 println!("{}", best_game);
             }
             let p1gr_deal = c.clone().into_iter().rev().collect();
@@ -68,6 +66,7 @@ fn play_many(cards: Vec<u8>) {
             if p1gr.game.steps > highscore {
                 highscore = p1gr.game.steps;
                 best_game = p1gr;
+                // best_games.push(p1gr);
                 println!("{}", best_game);
             }
             let p2gr_deal = c.clone().into_iter().rev().collect();
@@ -79,6 +78,7 @@ fn play_many(cards: Vec<u8>) {
                 println!("{}", best_game);
             }
             counter += 4;
+            // best_games.sort_by(|a, b| a.game.steps.cmp(&b.game.steps));
         }
         if counter % 1000000 == 0 {
             println!(
@@ -100,18 +100,14 @@ fn play_one(g: &mut Game) {
     while let Some(card) = g.p1hand.pop() {
         if card > 0 {
             // is this next card a penalty card?
-            g.penalty = card;
-            boring_card(g, card);
-            // print_internal_state(g);
+            penalty_card(g, card);
         } else {
             // it's not a penalty card, but we still have tribute to pay
             if g.penalty > 0 {
                 pay_tribute(g, card);
-            // print_internal_state(g);
             } else {
                 // nothing going on, play a card into the pot
                 boring_card(g, card);
-                // print_internal_state(g);
             }
         }
         g.steps += 1; // add one to steps
@@ -132,6 +128,12 @@ fn pay_tribute(g: &mut Game, card: u8) {
         g.p2hand.append(&mut g.pot); // add the pot
         g.swap(); // swap hands, winner is now active player
     }
+}
+
+fn penalty_card(g: &mut Game, card: u8) {
+    g.penalty = card;
+    g.pot.push(card);
+    g.swap(); // swap hands, other player is active
 }
 
 fn boring_card(g: &mut Game, card: u8) {
@@ -191,9 +193,9 @@ fn read_card(c: char) -> u8 {
     };
 }
 
-fn sum_penalty_cards(vd: &Vec<u8>) -> u8 {
-    return vd.iter().sum();
-}
+// fn sum_penalty_cards(vd: &Vec<u8>) -> u8 {
+//     return vd.iter().sum();
+// }
 
 fn count_penalty_cards(vd: &Vec<u8>) -> u8 {
     return vd.into_iter().filter(|x| **x > 0).count() as u8;
@@ -242,3 +244,25 @@ impl Game {
 //     // thread::sleep(tenth_sec);
 //     println!("{}                         {}                         {}",p1,pot, p2);
 // }
+
+// swap the penalty_card with every other position that's not this penalty_card
+fn wiggle(g: &mut GameState, penalty_card: u8) -> Vec<GameState> {
+    let mut cards = g.p1deal.clone();
+    cards.append(&mut g.p2deal);
+    let consume_cards = cards.clone();
+    let maybe_this_penalty_card_index = consume_cards.into_iter().position(|c| c == penalty_card);
+    let mut not_this_penalty_card_indices = cards
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &c)| if c == 4 { Some(index) } else { None })
+        .collect::<Vec<_>>();
+    let mut gvec: Vec<GameState> = Vec::with_capacity(64);
+    if let Some(ace_index) = maybe_this_penalty_card_index {
+        while let Some(not_ace_index) = not_this_penalty_card_indices.pop() {
+            let mut newcards = cards.clone();
+            newcards.swap(ace_index, not_ace_index);
+            gvec.push(deal(newcards, false));
+        }
+    }
+    return gvec;
+}
