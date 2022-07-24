@@ -1,6 +1,6 @@
 [package]
 name = "strip-jack-naked"
-version = "1.3.3"
+version = "1.5.1"
 authors = ["Shae Erisson <shae@scannedinavian.com>"]
 edition = "2021"
 
