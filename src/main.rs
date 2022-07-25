@@ -1,4 +1,4 @@
-use rand::Rng;
+// use rand::Rng;
 use std::fmt;
 use std::mem::swap;
 use std::time::Instant;
@@ -28,70 +28,47 @@ fn main() {
 fn play_many(cards: Vec<u8>) {
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     let mut counter = 0;
-    let mut highscore = 0;
-    // let mut best_games: Vec<GameState> = vec![];
+    let mut highscore = 1;
     let mut best_game = deal(cards.clone(), false);
     let start = Instant::now();
-    let mut rng = rand::thread_rng();
-
-    loop {
-        let mut newcards = cards.clone(); // [TODO] copy into instead?
-        rng.shuffle(&mut newcards);
-        for r in 0..51 {
-            let mut c = newcards.clone();
-            c.rotate_right(r);
-            let mut p1g = deal(c.clone(), false);
-            let p1_pen_card_count = count_penalty_cards(&p1g.p1deal);
+    // let mut rng = rand::thread_rng();
+    let mut games_best: Vec<GameState> = good_games();
+    games_best.sort_by(|a, b| a.game.steps.cmp(&b.game.steps));
+    // games_best.reverse();
+    while let Some(mut gamestate) = games_best.pop() {
+        // let mut newcards = cards.clone(); // [TODO] copy into instead?
+        // rng.shuffle(&mut newcards);
+        while let Some(mut wiggled_game) = wiggle_all(&mut gamestate).pop() {
+            let p1_pen_card_count = count_penalty_cards(&wiggled_game.p1deal);
             if p1_pen_card_count > 11 || p1_pen_card_count < 5 {
-                continue; // world record decks have no more than 11 and no less than 5 penalty cards
+                continue; // world record hands have no more than 11 and no less than 5 penalty cards
             }
-            play_one(&mut p1g.game);
-            if p1g.game.steps > highscore {
-                highscore = p1g.game.steps;
-                best_game = p1g;
-                // best_games.push(p1g);
+            play_one(&mut wiggled_game.game);
+            if wiggled_game.game.steps > highscore {
+                highscore = wiggled_game.game.steps;
+                let game_clone = wiggled_game.clone();
+                best_game = game_clone;
+                games_best.push(wiggled_game);
                 println!("{}", best_game);
             }
-            let mut p2g = deal(c.clone(), true);
-            play_one(&mut p2g.game);
-            if p2g.game.steps > highscore {
-                highscore = p2g.game.steps;
-                best_game = p2g;
-                // best_games.push(p2g);
-                println!("{}", best_game);
+            counter += 1;
+            if counter % 3000000 == 0 {
+                if let Some(recent_game) = games_best.last() {
+                    println!(
+			"{} best so far at {} games per second in play_many {}, games_best is {:?}, {} recent_game",
+			best_game,
+			counter / (start.elapsed().as_secs() + 1),
+			VERSION,
+			games_best,
+			recent_game
+		    );
+                }
             }
-            let p1gr_deal = c.clone().into_iter().rev().collect();
-            let mut p1gr = deal(p1gr_deal, false);
-            play_one(&mut p1gr.game);
-            if p1gr.game.steps > highscore {
-                highscore = p1gr.game.steps;
-                best_game = p1gr;
-                // best_games.push(p1gr);
-                println!("{}", best_game);
+            if counter > 10000000000 {
+                // if counter > 2000000 {
+                println!("{} games played", counter);
+                break;
             }
-            let p2gr_deal = c.clone().into_iter().rev().collect();
-            let mut p2gr = deal(p2gr_deal, true);
-            play_one(&mut p2gr.game);
-            if p2gr.game.steps > highscore {
-                highscore = p2gr.game.steps;
-                best_game = p2gr;
-                println!("{}", best_game);
-            }
-            counter += 4;
-            // best_games.sort_by(|a, b| a.game.steps.cmp(&b.game.steps));
-        }
-        if counter % 1000000 == 0 {
-            println!(
-                "{} best so far at {} games per second in play_many {}",
-                best_game,
-                counter / start.elapsed().as_secs(),
-                VERSION
-            );
-        }
-        if counter > 10000000000 {
-            // if counter > 2000000 {
-            println!("{} games played", counter);
-            break;
         }
     }
 }
@@ -142,11 +119,13 @@ fn boring_card(g: &mut Game, card: u8) {
 }
 
 // the actual game type
+#[derive(Debug, Clone)]
 pub struct GameState {
     p1deal: Vec<u8>,
     p2deal: Vec<u8>,
     game: Game,
 }
+#[derive(Debug, Clone)]
 pub struct Game {
     p1hand: Vec<u8>,
     p2hand: Vec<u8>,
@@ -245,6 +224,16 @@ impl Game {
 //     println!("{}                         {}                         {}",p1,pot, p2);
 // }
 
+fn wiggle_all(g: &mut GameState) -> Vec<GameState> {
+    let mut wiggled_games: Vec<GameState> = Vec::new();
+    for c in 1..4 {
+        let mut new_g = g.clone();
+        let mut wiggled_this_card = wiggle(&mut new_g, c);
+        wiggled_games.append(&mut wiggled_this_card);
+    }
+    return wiggled_games;
+}
+
 // swap the penalty_card with every other position that's not this penalty_card
 fn wiggle(g: &mut GameState, penalty_card: u8) -> Vec<GameState> {
     let mut cards = g.p1deal.clone();
@@ -265,4 +254,97 @@ fn wiggle(g: &mut GameState, penalty_card: u8) -> Vec<GameState> {
         }
     }
     return gvec;
+}
+
+fn good_games() -> Vec<GameState> {
+    let games = [
+        // ("K-Q------A-Q----K-JAJJ---Q", "-KK------AA--J---------Q--"),
+        // ("-----J-A--QQ-QA---K-------", "KJ-------K-------QAJ--JK-A"),
+        // ("---Q-A--AK-A-Q--J--K---A--", "----K------J--Q--K--J---JQ"),
+        // ("KA----QA-J----J--K-K---Q--", "-J-Q-----A-JQ-----A---K---"),
+        // ("-A---Q--AJ-AJ--K-K--------", "----------Q-K---QA--JJ-QK-"),
+        // ("--KQQQ--J--J--A-J-A---K-J-", "------A-----------KKA---Q-"),
+        // ("----J--Q--J--A---A-JJK--K-", "---A-----QQ--Q--K-A--K----"),
+        // ("---Q--KK----Q---A-J-------", "K-K--Q-J-AA-----J-A--Q--J-"),
+        // ("K---------------K-QJ-A-KQJ", "J--AQ---JA-----K----A---Q-"),
+        // ("----KKQ--AA--JQ---K-QJ-J--", "-A---K--A--Q----J---------"),
+        // ("Q-KJ--A-------Q-J-----KA--", "---J----K---Q-JAK------Q-A"),
+        // ("-QJ-------K--K--Q--AKJ---J", "-----AQ----J-A------Q--AK-"),
+        // ("-K---K----J--QQ--J-A---AK-", "--AK-Q---J-----AJ--Q------"),
+        // ("----------AA-K---QJ------K", "----QKQJ--JJ-A-AQ---K-----"),
+        // ("-JA-QQ-----A---J----JK-K--", "------K--A-Q--K---Q-----AJ"),
+        // ("--A-J-K--JJ-Q-K-QQ--------", "--------K-KQA-----J-A-A---"),
+        // ("-Q--------J-Q------A-JQ---", "J------J--A-----KKA-Q-KKA-"),
+        // ("KJA-----------------K---JQ", "---K--Q--Q--JQ-K-JA-A--A--"),
+        // ("-QA---KK-----Q---Q---A---A", "K-------J---A-----J-J-QKJ-"),
+        // ("--K----Q--J------Q------QK", "---JJ--JA---Q-A---A-KK-A--"),
+        // ("J------A---K-A-Q--JA-K----", "J----A------Q-Q-QJ--K---K-"),
+        // ("---K--Q--Q-J--------AK--KJ", "---QQ-----A---J--AK-J----A"),
+        // ("---AQ----A--J-AK---K--QQ--", "--------KJ----K-A--J---QJ-"),
+        // ("--Q--AK-Q---J----J----A---", "-Q-------KJK-----KA-QJ--A-"),
+        // ("-----J---A-KAK----Q-KJ----", "--A-KJ--JA----Q----Q-Q----"),
+        // ("J---K--Q---QK---K-J-K--J--", "----------JQ-AA---Q--A-A--"),
+        // ("K-Q-J----Q--J---K---JA----", "---QA-----Q-A-K--K-A----J-"),
+        // ("---KJAQ--JAA-A-----------J", "QQ--------Q---K-----J-K--K"),
+        // ("Q--J---Q--Q-A---K-----J--A", "J--K-A-K-----JAQ--K-------"),
+        // ("--A-----Q-K---Q----Q----J-", "--AQA--KJ--J-----K--J--K-A"),
+        // ("JAA-----Q-Q---------KAQJK-", "-KQ-A----J--------K------J"),
+        // ("---KK------Q-J------A-----", "JJ-Q---QA-Q---A-J-K-A-K---"),
+        // ("------A-A------J----K--KA-", "-----JJ-QQ-Q--K---Q----AJK"),
+        // ("-Q----KK----QA-AQJAK-K----", "-----------------J-J-AJ--Q"),
+        // ("---A---A--QJ--J----K--QK-K", "------JQ-------QA--K--A--J"),
+        // ("-JK----K-QA----QAK------K-", "------A-Q---J---J-JQ-A----"),
+        // ("------J-A-A--K---AQ-J--J--", "--K----QK-QJ---K--QA------"),
+        // ("----JK-A--------J--Q---A--", "QQ----A----Q-JKJ--K-A---K-"),
+        // ("-------QJ---A---QKKQ--J-AJ", "--------JAQ----A--K----K--"),
+        // ("---A-QK-J--Q-------K-A----", "-J-K-QA---Q------J-J---KA-"),
+        // ("---AJ-K-Q-----J---AKQ-----", "-QJ----Q--K---K---A---J-A-"),
+        // ("-QA-K--QK---Q--J----------", "A-J--J---A------A-K-KJQ---"),
+        // ("----Q------JJ---A-K---K--Q", "A-K-----JA-K-JQ---------AQ"),
+        // ("--JJ---Q---K-K-K--Q------A", "--K-----A---J--JQA-Q--A---"),
+        // ("---KQQJ-A----J---AJ-------", "K------------A--KKQ--AQ--J"),
+        // ("-------------Q-Q-A--J-AAKQ", "-K------J-----A--J-QJK-K--"),
+        // ("K---A----A---J--J-K-----J-", "----Q--QK-AJQ----K--A-Q---"),
+        // ("---A---A--A---Q-J--A-KK---", "--JQ------J--K----JQ--QK--"),
+        // ("--AQK------QAJQK--A-------", "--J-----JA--K-----J----QK-"),
+        // ("K-J--K------J-------JAA---", "--Q---Q--A-KK---J--Q--A--Q"),
+        // ("---A-----------Q--K-K-J-Q-", "-J-----KA-J-Q-Q--K--J-A--A"),
+        // ("--J-A-A-JK--K---A--K---K--", "---Q-AQ-Q---Q--J-J--------"),
+        // ("--A----Q-K---K--A-JQ-Q-J--", "--K--A--Q--------K---JA-J-"),
+        // ("------AJ--Q---AK---K-----Q", "Q---------KKJQ-JA------JA-"),
+        // ("JQ--J----K---KJ----A--A---", "J-Q---------AQ-Q-----K--KA"),
+        // ("---QK-A--A---A------J--J-K", "--K-A--K-----Q-----Q-QJJ--"),
+        // ("--A--A-KK--J--J-K-JQ--J---", "----KA-QQ---Q---------A---"),
+        // ("K-----J--J-J-----------A-A", "K-----Q--KKJA-------Q-Q-QA"),
+        // ("--A-KJQK-J-K---------A-QK-", "---QA--Q----JJ--A---------"),
+        // ("-AK--------K------J---QKQ-", "--Q-J-K---J-------J-QAA--A"),
+        // ("K----------A--A------KJ--J", "--KJ-Q---AA-Q-QQJ----K----"),
+        // ("K----A----J--JJ----QK-KQ--", "KJ-A--Q----------A------AQ"),
+        // ("J---K-------J-J-QA------J-", "-KQ-Q---A----A--QAKK------"),
+        // ("Q-K-A--A-----Q----J----JKQ", "--K-------AJ---Q-K-A-J----"),
+        // ("-QJK---K--J-Q--J-AK----A-K", "----------A--A----Q---J-Q-"),
+        // ("--J--J---------Q---KA-QQ--", "-K-K----AAKJ------A---Q--J"),
+        // ("K----AJ-----K---QK-Q--J--A", "-A-------K-J---------QAQ-J"),
+        // ("J--Q----Q-J----A----K--AJ-", "A--Q-----A------KQ-KK-J---"),
+        // ("-Q-Q------Q------A--A-KJ--", "----AA----J-----KQ-JK--J-K"),
+        // ("K----QJ---K---QA-K---JA---", "-J----------Q-J-A-----A-KQ"),
+        // ("-K---JJK-Q--------A--KAA-J", "-----A--Q------J-----K-QQ-"),
+        // ("---J---A-J-----K-A--JQ----", "J-------QK-KK---A-A---Q-Q-"),
+        // ("-----Q--KQ----QA---Q------", "J-KK--J--A-A-J-J---A----K-"),
+        // ("J----Q-K--A--J-A--J-Q-----", "-K-A-K--QQ--J------KA-----"),
+        // ("---Q---J--JA-QAQ---K------", "K-----K-JQ----J---K----AA-"),
+        // ("--------Q-J-----Q--Q--AJ--", "-AK--Q-A--K--AK-J-----KJ--"),
+        // ("--JK-----J-A-K----JQ---J--", "----A-QQ-----AK----AQ--K--"),
+        // ("--K-----QQ--A-KA--J--K--J-", "----A--Q-J----AK----Q--J--"),
+        // ("-J----K-----QQ--A-KA--J--K", "--J-----A--Q-J----AK----Q-"),
+        ("J---KK---------J--Q----J--", "---Q-K---A--Q-A-JAA---QK--"),
+        ("-----J-AA-------QA------J-", "J-QQ----A-KQ--KK--------JK"),
+    ];
+    let mut gs: Vec<GameState> = Vec::with_capacity(64);
+    for g in games {
+        let mut this_g = read_game(g.0, g.1);
+        play_one(&mut this_g.game);
+        gs.push(this_g);
+    }
+    return gs;
 }
