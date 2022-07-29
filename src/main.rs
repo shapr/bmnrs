@@ -1,4 +1,5 @@
 use rand::Rng;
+// use std::collections::BTreeMap;
 use std::fmt;
 use std::mem::swap;
 use std::time::Instant;
@@ -14,14 +15,7 @@ fn main() {
     for _c in 0..36 {
         cards.push(0); // 36 cards that don't matter
     }
-    {
-        // let mut test_game = read_game("-Q-Q-----JJ-K-----K-A--AKK", "---J-------A-----Q--J-A-Q-");
-        let mut g8344 = read_game("---AJ--Q---------QAKQJJ-QK", "-----A----KJ-K--------A---");
-        play_one(&mut g8344.game);
-        assert_eq!(g8344.game.steps, 8345); // sanity check, convert to test?
-    }
-    // let unplay_game = read_game("-----K-A--AKK--Q---JQ------------JAJ---K---", "Q--J-A-Q-");
-    // println!("{}",unplay_game);
+    check_all();
     play_many(cards);
 }
 
@@ -32,6 +26,7 @@ fn play_many(cards: Vec<u8>) {
     let mut best_game = deal(cards.clone(), false);
     let start = Instant::now();
     let mut rng = rand::thread_rng();
+    // let mut btm: BTreeMap<(Vec<u8>, Vec<u8>), u16> = BTreeMap::new();
 
     loop {
         let mut newcards = cards.clone(); // [TODO] copy into instead?
@@ -39,17 +34,19 @@ fn play_many(cards: Vec<u8>) {
         for r in 0..51 {
             let mut c = newcards.clone();
             c.rotate_right(r);
-            let mut p1g = deal(c.clone(), false);
+            let p1d = deal(c.clone(), false);
+            // if btm.contains_key(&(p1d.p1deal.clone(), p1d.p2deal.clone())) {
+            //	continue;
+            // }
+            let mut p1g = p1d;
+
             let p1_pen_card_count = count_penalty_cards(&p1g.p1deal);
             if p1_pen_card_count > 11 || p1_pen_card_count < 5 {
                 continue;
             }
-            // let p1sum = sum_penalty_cards(&p1g.p1deal);
-            // if p1sum > 28 || p1sum < 12 {
-            //	// seems to work for the leader board?
-            //	continue;
-            // }
             play_one(&mut p1g.game);
+            // play_match(&mut p1g.game);
+            // btm.insert((p1g.p1deal.clone(), p1g.p2deal.clone()), p1g.game.steps);
             if p1g.game.steps > highscore {
                 highscore = p1g.game.steps;
                 best_game = p1g;
@@ -57,6 +54,7 @@ fn play_many(cards: Vec<u8>) {
             }
             let mut p2g = deal(c.clone(), false);
             play_one(&mut p2g.game);
+            // play_match(&mut p2g.game);
             if p2g.game.steps > highscore {
                 highscore = p2g.game.steps;
                 best_game = p2g;
@@ -65,6 +63,7 @@ fn play_many(cards: Vec<u8>) {
             let p1gr_deal = c.clone().into_iter().rev().collect();
             let mut p1gr = deal(p1gr_deal, false);
             play_one(&mut p1gr.game);
+            // play_match(&mut p1gr.game);
             if p1gr.game.steps > highscore {
                 highscore = p1gr.game.steps;
                 best_game = p1gr;
@@ -73,6 +72,7 @@ fn play_many(cards: Vec<u8>) {
             let p2gr_deal = c.clone().into_iter().rev().collect();
             let mut p2gr = deal(p2gr_deal, true);
             play_one(&mut p2gr.game);
+            // play_match(&mut p2gr.game);
             if p2gr.game.steps > highscore {
                 highscore = p2gr.game.steps;
                 best_game = p2gr;
@@ -140,11 +140,14 @@ fn boring_card(g: &mut Game, card: u8) {
 }
 
 // the actual game type
+// #[derive(PartialEq, PartialOrd, Ord, Eq)]
 pub struct GameState {
+    // initial_deal : (Vec<u8>,Vec<u8>),
     p1deal: Vec<u8>,
     p2deal: Vec<u8>,
     game: Game,
 }
+// #[derive(Decode, Encode, PartialEq, PartialOrd, Ord, Eq)]
 pub struct Game {
     p1hand: Vec<u8>,
     p2hand: Vec<u8>,
@@ -156,8 +159,8 @@ pub struct Game {
 // how to display the game type
 impl fmt::Display for GameState {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        let p1: String = self.p1deal.iter().map(show_card).collect();
-        let p2: String = self.p2deal.iter().map(show_card).collect();
+        let p1: String = self.p1deal.iter().rev().map(show_card).collect();
+        let p2: String = self.p2deal.iter().rev().map(show_card).collect();
         write!(fmt, "{} {} {}", self.game.steps, p1, p2)
     }
 }
@@ -191,9 +194,9 @@ fn read_card(c: char) -> u8 {
     };
 }
 
-fn sum_penalty_cards(vd: &Vec<u8>) -> u8 {
-    return vd.iter().sum();
-}
+// fn sum_penalty_cards(vd: &Vec<u8>) -> u8 {
+//     return vd.iter().sum();
+// }
 
 fn count_penalty_cards(vd: &Vec<u8>) -> u8 {
     return vd.into_iter().filter(|x| **x > 0).count() as u8;
@@ -234,11 +237,81 @@ impl Game {
     }
 }
 
-// fn print_internal_state(g : &mut Game) {
+// fn print_internal_state(g: &mut Game) {
 //     let p1: String = g.p1hand.iter().map(show_card).collect();
 //     let p2: String = g.p2hand.iter().map(show_card).collect();
 //     let pot: String = g.pot.iter().map(show_card).collect();
 //     // let tenth_sec = time::Duration::from_millis(100);
 //     // thread::sleep(tenth_sec);
-//     println!("{}                         {}                         {}",p1,pot, p2);
+//     println!(
+//	"{}                         {}                         {}",
+//	p1, pot, p2
+//     );
 // }
+
+fn check_it(p1: &str, p2: &str, steps: u16) {
+    let (p1_copy, p2_copy) = (p1, p2).clone();
+    let mut game_state = read_game(p1, p2);
+    play_one(&mut game_state.game);
+    println!("testing {} is {} {}", game_state, p1_copy, p2_copy);
+
+    assert_eq!(game_state.game.steps, steps); // sanity check, convert to test?
+}
+
+fn check_all() {
+    check_it(
+        "---AJ--Q---------QAKQJJ-QK",
+        "-----A----KJ-K--------A---",
+        8345,
+    );
+    check_it(
+        "------------KAQ----J------",
+        "-JQQK---K----JK--QA-A-JA--",
+        4791,
+    );
+    check_it(
+        "---JQ---K-A----A-J-K---QK-",
+        "-J-----------AJQA----K---Q",
+        5790,
+    );
+    check_it(
+        "A-QK------Q----KA-----J---",
+        "-JAK----A--Q----J---QJ--K-",
+        6913,
+    );
+    check_it(
+        "K-KK----K-A-----JAA--Q--J-",
+        "---Q---Q-J-----J------AQ--",
+        7158,
+    );
+    check_it(
+        "----Q------A--K--A-A--QJK-",
+        "-Q--J--J---QK---K----JA---",
+        7208,
+    );
+    check_it(
+        "--A-Q--J--J---Q--AJ-K---K-",
+        "-J-------Q------A--A--QKK-",
+        7226,
+    );
+    check_it(
+        "-J------Q------AAA-----QQ-",
+        "K----JA-----------KQ-K-JJK",
+        7959,
+    );
+    check_it(
+        "----K---A--Q-A--JJA------J",
+        "-----KK---------A-JK-Q-Q-Q",
+        7972,
+    );
+    check_it(
+        "---Q--Q--J-Q-J----------A-",
+        "--K-K-KAQ-AA-----J-J-----K",
+        5676,
+    );
+    check_it(
+        "-J-QAA-----Q---K---Q-K--K-",
+        "-A-----Q---J---KJ-A-----J-",
+        5328,
+    );
+}
