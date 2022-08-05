@@ -7,6 +7,9 @@ edition = "2021"
 [dependencies]
 rand = "0.3"
 
+[dev-dependencies]
+proptest = "1.0.0"
+
 [profile.release]
 #debug = true
 codegen-units = 1
