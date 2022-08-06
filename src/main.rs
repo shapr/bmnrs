@@ -1,5 +1,4 @@
 use rand::Rng;
-// use proptest::prelude::*;
 // use std::collections::BTreeMap;
 use std::fmt;
 use std::mem::swap;
@@ -16,11 +15,11 @@ fn main() {
     for _c in 0..36 {
         cards.push(0); // 36 cards that don't matter
     }
-    // check_all();
-    // play_many(cards);
+    check_all();
+    play_many(cards);
     // 290 -A-J--Q---A-------Q-----Q- -JKA---Q-J-K-----K-A--J-K-
-    let g = read_game("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
-    record_26s_top(g.p1deal, g.p2deal);
+    // let g = read_game("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
+    // record_26s_top(g.p1deal, g.p2deal);
     //play_one(&mut g.game);
     // println!("final hands {:?} {:?}", g.game.p1hand,g.game.p2hand);
     // println!("unplay gives {:?}", unplay(g.game.p2hand, g.game.p1hand));
@@ -39,6 +38,7 @@ fn play_many(cards: Vec<u8>) {
         let mut newcards = cards.clone(); // [TODO] copy into instead?
         rng.shuffle(&mut newcards);
         for r in 0..51 {
+            // XXX THIS NEEDS TO BE ABSTRACTED OUT because I got stuff wrong since it's not
             let mut c = newcards.clone();
             c.rotate_right(r);
             let p1d = deal(c.clone(), false);
@@ -59,7 +59,7 @@ fn play_many(cards: Vec<u8>) {
                 best_game = p1g;
                 println!("{}", best_game);
             }
-            let mut p2g = deal(c.clone(), false);
+            let mut p2g = deal(c.clone(), true);
             play_one(&mut p2g.game);
             // play_match(&mut p2g.game);
             if p2g.game.steps > highscore {
@@ -108,16 +108,13 @@ fn play_one(g: &mut Game) {
         if card > 0 {
             // is this next card a penalty card?
             penalty_card(g, card);
-            // print_internal_state(g);
         } else {
             // it's not a penalty card, but we still have tribute to pay
             if g.penalty > 0 {
                 pay_tribute(g, card);
-            // print_internal_state(g);
             } else {
                 // nothing going on, play a card into the pot
                 boring_card(g, card);
-                // print_internal_state(g);
             }
         }
         g.steps += 1; // add one to steps
@@ -132,10 +129,19 @@ fn penalty_card(g: &mut Game, card: u8) {
     boring_card(g, card);
 }
 
+fn boring_card(g: &mut Game, card: u8) {
+    g.pot.push(card);
+    g.swap(); // swap hands, other player is active
+}
+
 fn pay_tribute(g: &mut Game, card: u8) {
     // penalty is active, and this is not a penalty card
     g.pot.push(card); // put this card in the pot
     g.penalty -= 1; // subtract one from penalty
+    penalty_check(g);
+}
+
+fn penalty_check(g: &mut Game) {
     if g.penalty == 0 {
         // battle is done, add pot to the non-active player's hand
         g.pot.reverse();
@@ -179,19 +185,10 @@ fn pay_tribute_check(g: &mut Game, card: u8, deals: &mut Vec<(Vec<u8>, Vec<u8>)>
         g.pot.append(&mut g.p2hand);
         g.p2hand.append(&mut g.pot); // add the pot
         g.swap(); // swap hands, winner is now active player
-        if g.p1hand.len() == 26 {
-            if g.p1active {
-                deals.append(&mut vec![(g.p1hand.clone(), g.p2hand.clone())]);
-            } else {
-                deals.append(&mut vec![(g.p2hand.clone(), g.p1hand.clone())]);
-            }
+        if g.p2hand.len() == 26 && g.p1hand.len() == 26 {
+            deals.append(&mut vec![(g.p1hand.clone(), g.p2hand.clone())]);
         }
     }
-}
-
-fn boring_card(g: &mut Game, card: u8) {
-    g.pot.push(card);
-    g.swap(); // swap hands, other player is active
 }
 
 // the actual game type
@@ -217,18 +214,13 @@ impl fmt::Display for GameState {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let p1: String = self.p1deal.iter().rev().map(show_card).collect();
         let p2: String = self.p2deal.iter().rev().map(show_card).collect();
-        if self.game.p1active {
-            write!(fmt, "{} {} {}", self.game.steps, p1, p2)
-        } else {
-            write!(fmt, "{} {} {}", self.game.steps, p2, p1)
-        }
+        write!(fmt, "{} {} {}", self.game.steps, p1, p2)
     }
 }
 
 // create a game from two strings
 fn read_game(p1: &str, p2: &str) -> GameState {
     let (p1deal, p2deal) = read_hands(p1, p2);
-
     return make_game(p1deal, p2deal);
 }
 
@@ -260,10 +252,6 @@ fn read_card(c: char) -> u8 {
     };
 }
 
-// fn sum_penalty_cards(vd: &Vec<u8>) -> u8 {
-//     return vd.iter().sum();
-// }
-
 fn count_penalty_cards(vd: &Vec<u8>) -> u8 {
     return vd.into_iter().filter(|x| **x > 0).count() as u8;
 }
@@ -273,16 +261,19 @@ fn deal(mut cards: Vec<u8>, swap: bool) -> GameState {
     let mut deal2: Vec<u8> = Vec::with_capacity(64);
     deal1.append(&mut cards.split_off(26)); // first 26 cards dealt to p1
     deal2.append(&mut cards); // last 26 cards dealt to p2
-    let mut g = make_game(deal1, deal2);
+    let g: GameState;
+
     if swap {
-        g.game.swap();
+        g = make_game(deal2, deal1);
+    } else {
+        g = make_game(deal1, deal2);
     }
     return g;
 }
 
 fn make_game(mut deal1: Vec<u8>, mut deal2: Vec<u8>) -> GameState {
-    deal1.reverse();
-    deal2.reverse();
+    deal1.reverse(); // XXX do I really need this?
+    deal2.reverse(); // I'm not convinced
     return GameState {
         p1deal: deal1.clone(),
         p2deal: deal2.clone(),
@@ -304,18 +295,6 @@ impl Game {
         self.p1active ^= true;
     }
 }
-
-// fn print_internal_state(g: &mut Game) {
-//     let p1: String = g.p1hand.iter().map(show_card).collect();
-//     let p2: String = g.p2hand.iter().map(show_card).collect();
-//     let pot: String = g.pot.iter().map(show_card).collect();
-//     // let tenth_sec = time::Duration::from_millis(100);
-//     // thread::sleep(tenth_sec);
-//     println!(
-//	"{}                         {}                         {}",
-//	p1, pot, p2
-//     );
-// }
 
 fn check_it(p1: &str, p2: &str, steps: u16) {
     let (p1_copy, p2_copy) = (p1, p2).clone();
@@ -408,36 +387,36 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     proptest! {
-        #[test]
-        fn prop_test_untrick(a in 1..5) {
-        let mut c_v : Vec<u8> = vec![a as u8];
-        for _z in 1 .. a+1 {
-            c_v.push(0);
-        }
-        let mut res = c_v.clone();
-        res.reverse();
-        prop_assert_eq!(untrick(&mut c_v),vec![(res,vec![])]);
-        }
-        #[test]
-        fn prop_test_untrickable_true(a in 1..5) {
-        let mut c_v : Vec<u8> = vec![a as u8];
-        for _z in 1 .. a+1 {
-            c_v.push(0);
-        }
-        let mut res = c_v.clone();
-        res.reverse();
-        prop_assert_eq!(untrickable(c_v),true);
-        }
-        #[test]
-        fn prop_test_untrickable_false(a in 1..5) {
-        let mut c_v : Vec<u8> = vec![a as u8];
-        for _z in 1 .. a {
-            c_v.push(0);
-        }
-        let mut res = c_v.clone();
-        res.reverse();
-        prop_assert_eq!(untrickable(c_v),false);
-        }
+    #[test]
+    fn prop_test_untrick(a in 1..5) {
+    let mut c_v : Vec<u8> = vec![a as u8];
+    for _z in 1 .. a+1 {
+    c_v.push(0);
+    }
+    let mut res = c_v.clone();
+    res.reverse();
+    prop_assert_eq!(untrick(&mut c_v),vec![(res,vec![])]);
+    }
+    #[test]
+    fn prop_test_untrickable_true(a in 1..5) {
+    let mut c_v : Vec<u8> = vec![a as u8];
+    for _z in 1 .. a+1 {
+    c_v.push(0);
+    }
+    let mut res = c_v.clone();
+    res.reverse();
+    prop_assert_eq!(untrickable(c_v),true);
+    }
+    #[test]
+    fn prop_test_untrickable_false(a in 1..5) {
+    let mut c_v : Vec<u8> = vec![a as u8];
+    for _z in 1 .. a {
+    c_v.push(0);
+    }
+    let mut res = c_v.clone();
+    res.reverse();
+    prop_assert_eq!(untrickable(c_v),false);
+    }
     }
 
     #[test]
@@ -721,8 +700,8 @@ mod tests {
         assert_eq!(unplay(big, vec![]), output);
     }
     #[test]
-    fn test_record_26s_top() {
-        // nextDeck26s  (dispRev "-JA--Q-JK--------Q-JKK----") (dispRev "----J----A-A---Q-A----QK--")
+    fn test_next_deck_26s() {
+        // nextDeck26s (dispRev "-JA--Q-JK--------Q-JKK----") (dispRev "----J----A-A---Q-A----QK--")
         // ([0,0,0,0,4,0,4,0,0,0,2,0,4,0,0,0,0,2,3,0,0,4,0,0,1,0],[0,2,0,1,3,0,0,0,0,0,0,0,0,2,0,1,3,3,0,0,0,0,0,0,1,0])
         let (hand_one, hand_two) =
             read_hands("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
@@ -761,6 +740,35 @@ mod tests {
                 [0, 0, 0, 1, 0, 0, 0, 0, 0, 3, 0, 3, 4, 2, 0, 0, 0, 0, 0, 0, 4, 0, 0, 4, 1, 0]
                     .to_vec(),
                 [0, 0, 0, 0, 3, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 3, 0, 0, 0, 4, 1, 0]
+                    .to_vec()
+            )
+        );
+    }
+    #[test]
+    fn test_fast_play_next_26s() {
+        /* fastPlayNext26s [] (Player 0 mempty (dispRev "J--A----K-Q------AA-J--KQ-")) (Player 0 mempty (dispRev "-J--Q--K-A-QK-----------J-")) (-1) 0
+        ([0,0,0,0,4,0,0,0,0,4,0,0,0,0,0,0,0,3,1,2,0,0,0,4,1,0].to_vec(),[2,0,0,0,0,0,0,3,3,0,4,0,2,0,2,0,0,3,0,0,0,0,0,1,1,0].to_vec()) */
+        let (hand_one, hand_two) =
+            read_hands("J--A----K-Q------AA-J--KQ-", "-J--Q--K-A-QK-----------J-");
+        assert_eq!(
+            fast_play_next_26s(hand_one, hand_two),
+            (
+                [0, 0, 0, 0, 4, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 3, 1, 2, 0, 0, 0, 4, 1, 0]
+                    .to_vec(),
+                [2, 0, 0, 0, 0, 0, 0, 3, 3, 0, 4, 0, 2, 0, 2, 0, 0, 3, 0, 0, 0, 0, 0, 1, 1, 0]
+                    .to_vec()
+            )
+        );
+        /* fastPlayNext26s [] (Player 0 mempty (dispRev "-JA--Q-JK--------Q-JKK----")) (Player 0 mempty (dispRev "----J----A-A---Q-A----QK--")) (-1) 0
+        ([0,0,0,0,4,0,4,0,0,0,2,0,4,0,0,0,0,2,3,0,0,4,0,0,1,0].to_vec(),[0,2,0,1,3,0,0,0,0,0,0,0,0,2,0,1,3,3,0,0,0,0,0,0,1,0].to_vec()) */
+        let (hand_one, hand_two) =
+            read_hands("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
+        assert_eq!(
+            fast_play_next_26s(hand_one, hand_two),
+            (
+                [0, 0, 0, 0, 4, 0, 4, 0, 0, 0, 2, 0, 4, 0, 0, 0, 0, 2, 3, 0, 0, 4, 0, 0, 1, 0]
+                    .to_vec(),
+                [0, 2, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 3, 3, 0, 0, 0, 0, 0, 0, 1, 0]
                     .to_vec()
             )
         );
@@ -808,7 +816,7 @@ fn next_deck_26s(hand_one: Vec<u8>, hand_two: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
 // why only one? why not all of them?
 fn fast_play_next_26s(hand_one: Vec<u8>, hand_two: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
     let mut g = make_game(hand_one, hand_two);
-    let mut deals = Vec::new();
+    let mut deals = Vec::with_capacity(32);
     play_one_check(&mut g.game, &mut deals);
     return match deals.first() {
         Some((h1, h2)) => {
