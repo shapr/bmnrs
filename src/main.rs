@@ -16,11 +16,16 @@ fn main() {
         cards.push(0); // 36 cards that don't matter
     }
     {
-        check_all();
+        // check_all();
         // // 290 -A-J--Q---A-------Q-----Q- -JKA---Q-J-K-----K-A--J-K-
-        // let (hand_one, hand_two) =
-        //	read_hands("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
-        //	record_26s_top(hand_one, hand_two);
+        // let (hand_one, hand_two) = read_hands("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
+        // let (hand_one, hand_two) = read_hands("-K-J---A----A----Q--Q-K---", "---J-------K-J--KA-Q--J-AQ");
+        // record_26s_top(hand_one, hand_two);
+        let (hand_one, hand_two) =
+            read_hands("J----J--KQ--K-----QQ----K-", "---Q-A----AA-----A-JK---J-");
+        record_26s_top(hand_one, hand_two);
+        // let (hand_one, hand_two) = read_hands("----------J-J-AQJ--Q----AA", "K---K----K------JQQ-K----A");
+        // record_26s_top(hand_one, hand_two);
     }
     play_many(cards);
     // play_one(&mut g.game);
@@ -87,8 +92,11 @@ fn record_best_play_one(gs: &mut GameState, highscore: &mut u16, best_game: &mut
         *highscore = gs.game.steps;
         *best_game = gs.clone();
         println!("{}", best_game.clone());
-        // record_26s_top(gs.p1deal.clone(), gs.p2deal.clone());
-        // record_26s_top(gs.p2deal, gs.p1deal);
+        let (mut hand_one_unplay, mut hand_two_unplay) = (gs.p1deal.clone(), gs.p2deal.clone());
+        hand_one_unplay.reverse();
+        hand_two_unplay.reverse();
+        record_26s_top(hand_one_unplay, hand_two_unplay);
+        // record_26s_top(gs.p2deal.clone(), gs.p1deal.clone());
     }
 }
 
@@ -854,9 +862,9 @@ mod tests {
 
 // record26sTop h0 h1 = uncurry record26s_alt_disp (nextDeck26s h0 h1)
 fn record_26s_top(hand_one: Vec<u8>, hand_two: Vec<u8>) {
-    //println!("{:?} {:?} is inputs for record_26s_top", hand_one.clone(), hand_two.clone()); // THESE REALLY EXIST
+    // println!("{:?} {:?} is inputs for record_26s_top", hand_one.clone(), hand_two.clone()); // THESE REALLY EXIST
     let (hand_one_next, hand_two_next) = next_deck_26s(hand_one, hand_two);
-    //println!("{:?} {:?} is result from for next_deck_26s", hand_one_next.clone(), hand_two_next.clone()); // but these?
+    // println!("{:?} {:?} is result from for next_deck_26s", hand_one_next.clone(), hand_two_next.clone()); // but these?
     // println!(
     //	"record_26s_top {:?} {:?}",
     //	hand_one_next.clone(),
@@ -866,13 +874,13 @@ fn record_26s_top(hand_one: Vec<u8>, hand_two: Vec<u8>) {
 }
 
 fn record26s_alt_disp(hand_one: Vec<u8>, hand_two: Vec<u8>) {
-    //println!("{:?} {:?} is inputs for record26s_alt_disp", hand_one.clone(), hand_two.clone());
+    // println!("{:?} {:?} is inputs for record26s_alt_disp", hand_one.clone(), hand_two.clone());
     let mut best_game = make_game(hand_one.clone(), hand_two.clone());
-    //println!("{} is best_game", best_game);
+    // println!("{} is best_game", best_game);
     let all_unplays = unplay(hand_one.clone(), hand_two.clone());
     // let mut more_unplays = unplay(hand_two, hand_one);
     // all_unplays.append(&mut more_unplays);
-    //println!("all_unplays {:?}", all_unplays);
+    // println!("all_unplays {:?}", all_unplays);
     let unplay_26 = all_unplays
         .iter()
         .filter(|(h1, h2)| h1.len() == 26 && h2.len() == 26);
