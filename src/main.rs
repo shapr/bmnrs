@@ -15,11 +15,13 @@ fn main() {
     for _c in 0..36 {
         cards.push(0); // 36 cards that don't matter
     }
-    // check_all();
-    // 290 -A-J--Q---A-------Q-----Q- -JKA---Q-J-K-----K-A--J-K-
-    let (hand_one, hand_two) =
-        read_hands("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
-    record_26s_top(hand_one, hand_two);
+    {
+        check_all();
+        // // 290 -A-J--Q---A-------Q-----Q- -JKA---Q-J-K-----K-A--J-K-
+        // let (hand_one, hand_two) =
+        //	read_hands("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
+        //	record_26s_top(hand_one, hand_two);
+    }
     play_many(cards);
     // play_one(&mut g.game);
     // println!("final hands {:?} {:?}", g.game.p1hand,g.game.p2hand);
@@ -41,31 +43,22 @@ fn play_many(cards: Vec<u8>) {
         for r in 0..51 {
             let mut c = newcards.clone();
             c.rotate_right(r);
-            let p1d = deal(c.clone(), false);
+            let mut p1d = deal(c.clone(), false);
             // if btm.contains_key(&(p1d.p1deal.clone(), p1d.p2deal.clone())) {
             //	continue;
             // }
-
-            let mut swappy: Vec<GameState> = vec![
-                p1d,
-                deal(c.clone(), true),
-                deal(c.clone().into_iter().rev().collect(), false),
-                deal(c.clone().into_iter().rev().collect(), true),
-            ];
-            while let Some(mut g) = swappy.pop() {
-                let p1_pen_card_count = count_penalty_cards(&g.p1deal);
-                if p1_pen_card_count > 11 || p1_pen_card_count < 5 {
-                    continue;
-                }
-                play_one(&mut g.game);
-                if g.game.steps > highscore {
-                    highscore = g.game.steps;
-                    best_game = g.clone();
-                    println!("{}", best_game);
-                    // record_26s_top(g.p1deal.clone(), g.p2deal.clone());
-                    // record_26s_top(g.p2deal, g.p1deal);
-                }
-            }
+            record_best_play_one(&mut p1d, &mut highscore, &mut best_game);
+            record_best_play_one(&mut deal(c.clone(), true), &mut highscore, &mut best_game);
+            record_best_play_one(
+                &mut deal(c.clone().into_iter().rev().collect(), false),
+                &mut highscore,
+                &mut best_game,
+            );
+            record_best_play_one(
+                &mut deal(c.clone().into_iter().rev().collect(), true),
+                &mut highscore,
+                &mut best_game,
+            );
             counter += 4;
         }
         if counter % 1000000 == 0 {
@@ -84,23 +77,42 @@ fn play_many(cards: Vec<u8>) {
     }
 }
 
+fn record_best_play_one(gs: &mut GameState, highscore: &mut u16, best_game: &mut GameState) {
+    // let p1_pen_card_count = count_penalty_cards(&g.p1deal);
+    // if p1_pen_card_count > 11 || p1_pen_card_count < 5 {
+    //	continue;
+    // }
+    play_one(&mut gs.game);
+    if gs.game.steps > *highscore {
+        *highscore = gs.game.steps;
+        *best_game = gs.clone();
+        println!("{}", best_game.clone());
+        // record_26s_top(gs.p1deal.clone(), gs.p2deal.clone());
+        // record_26s_top(gs.p2deal, gs.p1deal);
+    }
+}
+
 fn play_one(g: &mut Game) {
     while let Some(card) = g.p1hand.pop() {
-        if card > 0 {
-            // is this next card a penalty card?
-            penalty_card(g, card);
-        } else {
-            // it's not a penalty card, but we still have tribute to pay
-            if g.penalty > 0 {
-                pay_tribute(g, card);
-            } else {
-                // nothing going on, play a card into the pot
-                boring_card(g, card);
-            }
-        }
+        play_one_step(card, g);
         g.steps += 1; // add one to steps
-        if g.steps > 8500 {
-            break; // this is a record breaker
+                      // if g.steps > 8500 {
+                      //     break; // this is a record breaker
+                      // }
+    }
+}
+
+fn play_one_step(card: u8, g: &mut Game) {
+    if card > 0 {
+        // is this next card a penalty card?
+        penalty_card(g, card);
+    } else {
+        // it's not a penalty card, but we still have tribute to pay
+        if g.penalty > 0 {
+            pay_tribute(g, card);
+        } else {
+            // nothing going on, play a card into the pot
+            boring_card(g, card);
         }
     }
 }
@@ -119,17 +131,18 @@ fn pay_tribute(g: &mut Game, card: u8) {
     // penalty is active, and this is not a penalty card
     g.pot.push(card); // put this card in the pot
     g.penalty -= 1; // subtract one from penalty
-    penalty_check(g);
+    if g.penalty == 0 {
+        penalty_check(g);
+    }
 }
 
 fn penalty_check(g: &mut Game) {
-    if g.penalty == 0 {
-        // battle is done, add pot to the non-active player's hand
-        g.pot.reverse();
-        g.pot.append(&mut g.p2hand);
-        g.p2hand.append(&mut g.pot); // add the pot
-        g.swap(); // swap hands, winner is now active player
-    }
+    // battle is done, add pot to the non-active player's hand
+    g.pot.reverse();
+    g.pot.append(&mut g.p2hand);
+    g.p2hand.append(&mut g.pot); // add the pot
+                                 // g.p2hand.splice(..0, g.pot.drain(..));
+    g.swap(); // swap hands, winner is now active player
 }
 
 fn play_one_check(g: &mut Game, deals: &mut Vec<(Vec<u8>, Vec<u8>)>) {
