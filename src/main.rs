@@ -16,21 +16,12 @@ fn main() {
         cards.push(0); // 36 cards that don't matter
     }
     {
-        // check_all();
-        // // 290 -A-J--Q---A-------Q-----Q- -JKA---Q-J-K-----K-A--J-K-
-        // let (hand_one, hand_two) = read_hands("-JA--Q-JK--------Q-JKK----", "----J----A-A---Q-A----QK--");
-        // let (hand_one, hand_two) = read_hands("-K-J---A----A----Q--Q-K---", "---J-------K-J--KA-Q--J-AQ");
-        // record_26s_top(hand_one, hand_two);
+        check_all();
         let (hand_one, hand_two) =
             read_hands("J----J--KQ--K-----QQ----K-", "---Q-A----AA-----A-JK---J-");
         record_26s_top(hand_one, hand_two);
-        // let (hand_one, hand_two) = read_hands("----------J-J-AQJ--Q----AA", "K---K----K------JQQ-K----A");
-        // record_26s_top(hand_one, hand_two);
     }
     play_many(cards);
-    // play_one(&mut g.game);
-    // println!("final hands {:?} {:?}", g.game.p1hand,g.game.p2hand);
-    // println!("unplay gives {:?}", unplay(g.game.p2hand, g.game.p1hand));
 }
 
 fn play_many(cards: Vec<u8>) {
@@ -38,6 +29,7 @@ fn play_many(cards: Vec<u8>) {
     let mut counter = 0;
     let mut highscore = 0;
     let mut best_game = deal(cards.clone(), false);
+    let mut best_game_unplay = deal(cards.clone(), false);
     let start = Instant::now();
     let mut rng = rand::thread_rng();
     // let mut btm: BTreeMap<(Vec<u8>, Vec<u8>), u16> = BTreeMap::new();
@@ -52,24 +44,37 @@ fn play_many(cards: Vec<u8>) {
             // if btm.contains_key(&(p1d.p1deal.clone(), p1d.p2deal.clone())) {
             //	continue;
             // }
-            record_best_play_one(&mut p1d, &mut highscore, &mut best_game);
-            record_best_play_one(&mut deal(c.clone(), true), &mut highscore, &mut best_game);
+            record_best_play_one(
+                &mut p1d,
+                &mut highscore,
+                &mut best_game,
+                &mut best_game_unplay,
+            );
+            record_best_play_one(
+                &mut deal(c.clone(), true),
+                &mut highscore,
+                &mut best_game,
+                &mut best_game_unplay,
+            );
             record_best_play_one(
                 &mut deal(c.clone().into_iter().rev().collect(), false),
                 &mut highscore,
                 &mut best_game,
+                &mut best_game_unplay,
             );
             record_best_play_one(
                 &mut deal(c.clone().into_iter().rev().collect(), true),
                 &mut highscore,
                 &mut best_game,
+                &mut best_game_unplay,
             );
             counter += 4;
         }
         if counter % 1000000 == 0 {
             println!(
-                "{} best so far at {} games per second in play_many {}",
+                "{} best shuffled, {} best unplayed at {} games per second in play_many {}",
                 best_game,
+                best_game_unplay,
                 counter / start.elapsed().as_secs(),
                 VERSION
             );
@@ -82,7 +87,12 @@ fn play_many(cards: Vec<u8>) {
     }
 }
 
-fn record_best_play_one(gs: &mut GameState, highscore: &mut u16, best_game: &mut GameState) {
+fn record_best_play_one(
+    gs: &mut GameState,
+    highscore: &mut u16,
+    best_game: &mut GameState,
+    best_game_unplay: &mut GameState,
+) {
     // let p1_pen_card_count = count_penalty_cards(&g.p1deal);
     // if p1_pen_card_count > 11 || p1_pen_card_count < 5 {
     //	continue;
@@ -95,8 +105,11 @@ fn record_best_play_one(gs: &mut GameState, highscore: &mut u16, best_game: &mut
         let (mut hand_one_unplay, mut hand_two_unplay) = (gs.p1deal.clone(), gs.p2deal.clone());
         hand_one_unplay.reverse();
         hand_two_unplay.reverse();
-        record_26s_top(hand_one_unplay, hand_two_unplay);
-        // record_26s_top(gs.p2deal.clone(), gs.p1deal.clone());
+        let game_unplay = record_26s_top(hand_one_unplay, hand_two_unplay);
+        if game_unplay.game.steps > best_game_unplay.game.steps {
+            *best_game_unplay = game_unplay.clone();
+            println!("{} best_game_unplay", best_game_unplay);
+        }
     }
 }
 
@@ -153,7 +166,7 @@ fn penalty_check(g: &mut Game) {
     g.swap(); // swap hands, winner is now active player
 }
 
-fn play_one_check(g: &mut Game, deals: &mut Vec<(Vec<u8>, Vec<u8>)>) {
+fn play_one_check(g: &mut Game, deals: &mut Option<(Vec<u8>, Vec<u8>)>) {
     while let Some(card) = g.p1hand.pop() {
         if card > 0 {
             // is this next card a penalty card?
@@ -177,7 +190,7 @@ fn play_one_check(g: &mut Game, deals: &mut Vec<(Vec<u8>, Vec<u8>)>) {
     }
 }
 
-fn pay_tribute_check(g: &mut Game, card: u8, deals: &mut Vec<(Vec<u8>, Vec<u8>)>) {
+fn pay_tribute_check(g: &mut Game, card: u8, deals: &mut Option<(Vec<u8>, Vec<u8>)>) {
     // penalty is active, and this is not a penalty card
     g.pot.push(card); // put this card in the pot
     g.penalty -= 1; // subtract one from penalty
@@ -188,7 +201,7 @@ fn pay_tribute_check(g: &mut Game, card: u8, deals: &mut Vec<(Vec<u8>, Vec<u8>)>
         g.p2hand.append(&mut g.pot); // add the pot
         g.swap(); // swap hands, winner is now active player
         if g.p2hand.len() == 26 && g.p1hand.len() == 26 {
-            deals.append(&mut vec![(g.p1hand.clone(), g.p2hand.clone())]);
+            *deals = Some((g.p1hand.clone(), g.p2hand.clone()));
         }
     }
 }
@@ -254,9 +267,9 @@ fn read_card(c: char) -> u8 {
     };
 }
 
-fn count_penalty_cards(vd: &Vec<u8>) -> u8 {
-    return vd.into_iter().filter(|x| **x > 0).count() as u8;
-}
+// fn count_penalty_cards(vd: &Vec<u8>) -> u8 {
+//     return vd.into_iter().filter(|x| **x > 0).count() as u8;
+// }
 
 fn deal(mut cards: Vec<u8>, swap: bool) -> GameState {
     let mut deal1: Vec<u8> = Vec::with_capacity(64);
@@ -861,7 +874,7 @@ mod tests {
 }
 
 // record26sTop h0 h1 = uncurry record26s_alt_disp (nextDeck26s h0 h1)
-fn record_26s_top(hand_one: Vec<u8>, hand_two: Vec<u8>) {
+fn record_26s_top(hand_one: Vec<u8>, hand_two: Vec<u8>) -> GameState {
     // println!("{:?} {:?} is inputs for record_26s_top", hand_one.clone(), hand_two.clone()); // THESE REALLY EXIST
     let (hand_one_next, hand_two_next) = next_deck_26s(hand_one, hand_two);
     // println!("{:?} {:?} is result from for next_deck_26s", hand_one_next.clone(), hand_two_next.clone()); // but these?
@@ -870,10 +883,10 @@ fn record_26s_top(hand_one: Vec<u8>, hand_two: Vec<u8>) {
     //	hand_one_next.clone(),
     //	hand_two_next.clone()
     // );
-    record26s_alt_disp(hand_one_next, hand_two_next);
+    return record26s_alt_disp(hand_one_next, hand_two_next);
 }
 
-fn record26s_alt_disp(hand_one: Vec<u8>, hand_two: Vec<u8>) {
+fn record26s_alt_disp(hand_one: Vec<u8>, hand_two: Vec<u8>) -> GameState {
     // println!("{:?} {:?} is inputs for record26s_alt_disp", hand_one.clone(), hand_two.clone());
     let mut best_game = make_game(hand_one.clone(), hand_two.clone());
     // println!("{} is best_game", best_game);
@@ -892,7 +905,8 @@ fn record26s_alt_disp(hand_one: Vec<u8>, hand_two: Vec<u8>) {
             // println!("{} best temp game", best_game);
         }
     }
-    println!("{} best unplayed game", best_game);
+    // println!("{} best unplayed game", best_game.clone());
+    return best_game;
 
     // let matches: Vec<&(Vec<u8>, Vec<u8>)> = unplay(hand_one, hand_two).iter().filter(|(_0, _1)| _0.len() == 26 && _1.len() == 26).collect::<Vec<_>>();
 }
@@ -915,9 +929,9 @@ fn next_deck_26s(hand_one: Vec<u8>, hand_two: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
 // why only one? why not all of them?
 fn fast_play_next_26s(hand_one: Vec<u8>, hand_two: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
     let mut g = make_game(hand_one, hand_two);
-    let mut deals = Vec::with_capacity(32);
+    let mut deals: Option<(Vec<u8>, Vec<u8>)> = None;
     play_one_check(&mut g.game, &mut deals);
-    return match deals.first() {
+    return match deals {
         Some((h1, h2)) => {
             let (mut h1_ret, mut h2_ret) = (h1.clone(), h2.clone());
             h1_ret.reverse();

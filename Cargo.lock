@@ -265,7 +265,7 @@ dependencies = [
 
 [[package]]
 name = "strip-jack-naked"
-version = "1.8.1"
+version = "2.0.0"
 dependencies = [
  "proptest",
  "rand 0.3.23",
