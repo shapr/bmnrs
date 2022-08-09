@@ -1,5 +1,4 @@
 use rand::Rng;
-// use std::collections::BTreeMap;
 use std::fmt;
 use std::mem::swap;
 use std::time::Instant;
@@ -32,7 +31,6 @@ fn play_many(cards: Vec<u8>) {
     let mut best_game_unplay = deal(cards.clone(), false);
     let start = Instant::now();
     let mut rng = rand::thread_rng();
-    // let mut btm: BTreeMap<(Vec<u8>, Vec<u8>), u16> = BTreeMap::new();
 
     loop {
         let mut newcards = cards.clone(); // [TODO] copy into instead?
@@ -41,9 +39,6 @@ fn play_many(cards: Vec<u8>) {
             let mut c = newcards.clone();
             c.rotate_right(r);
             let mut p1d = deal(c.clone(), false);
-            // if btm.contains_key(&(p1d.p1deal.clone(), p1d.p2deal.clone())) {
-            //	continue;
-            // }
             record_best_play_one(
                 &mut p1d,
                 &mut highscore,
@@ -98,6 +93,7 @@ fn record_best_play_one(
     //	continue;
     // }
     play_one(&mut gs.game);
+
     if gs.game.steps > *highscore {
         *highscore = gs.game.steps;
         *best_game = gs.clone();
@@ -166,21 +162,18 @@ fn penalty_check(g: &mut Game) {
     g.swap(); // swap hands, winner is now active player
 }
 
-fn play_one_check(g: &mut Game, deals: &mut Option<(Vec<u8>, Vec<u8>)>) {
+fn play_one_check(g: &mut Game, deals: &mut Vec<(Vec<u8>, Vec<u8>)>) {
     while let Some(card) = g.p1hand.pop() {
         if card > 0 {
             // is this next card a penalty card?
             penalty_card(g, card);
-            // print_internal_state(g);
         } else {
             // it's not a penalty card, but we still have tribute to pay
             if g.penalty > 0 {
                 pay_tribute_check(g, card, deals);
-            // print_internal_state(g);
             } else {
                 // nothing going on, play a card into the pot
                 boring_card(g, card);
-                // print_internal_state(g);
             }
         }
         g.steps += 1; // add one to steps
@@ -190,7 +183,7 @@ fn play_one_check(g: &mut Game, deals: &mut Option<(Vec<u8>, Vec<u8>)>) {
     }
 }
 
-fn pay_tribute_check(g: &mut Game, card: u8, deals: &mut Option<(Vec<u8>, Vec<u8>)>) {
+fn pay_tribute_check(g: &mut Game, card: u8, deals: &mut Vec<(Vec<u8>, Vec<u8>)>) {
     // penalty is active, and this is not a penalty card
     g.pot.push(card); // put this card in the pot
     g.penalty -= 1; // subtract one from penalty
@@ -201,7 +194,7 @@ fn pay_tribute_check(g: &mut Game, card: u8, deals: &mut Option<(Vec<u8>, Vec<u8
         g.p2hand.append(&mut g.pot); // add the pot
         g.swap(); // swap hands, winner is now active player
         if g.p2hand.len() == 26 && g.p1hand.len() == 26 {
-            *deals = Some((g.p1hand.clone(), g.p2hand.clone()));
+            deals.push((g.p1hand.clone(), g.p2hand.clone()));
         }
     }
 }
@@ -221,7 +214,6 @@ pub struct Game {
     pot: Vec<u8>,
     penalty: u8,
     steps: u16,
-    p1active: bool,
 }
 
 // how to display the game type
@@ -236,6 +228,8 @@ impl fmt::Display for GameState {
 // create a game from two strings
 fn read_game(p1: &str, p2: &str) -> GameState {
     let (p1deal, p2deal) = read_hands(p1, p2);
+    // p1deal.reverse();
+    // p2deal.reverse();
     return make_game(p1deal, p2deal);
 }
 
@@ -287,8 +281,8 @@ fn deal(mut cards: Vec<u8>, swap: bool) -> GameState {
 }
 
 fn make_game(mut deal1: Vec<u8>, mut deal2: Vec<u8>) -> GameState {
-    deal1.reverse(); // XXX do I really need this?
-    deal2.reverse(); // I'm not convinced
+    deal1.reverse(); // XXX I *do* really need this, because other code depends on it, ARGH
+    deal2.reverse();
     return GameState {
         p1deal: deal1.clone(),
         p2deal: deal2.clone(),
@@ -298,7 +292,6 @@ fn make_game(mut deal1: Vec<u8>, mut deal2: Vec<u8>) -> GameState {
             pot: Vec::with_capacity(64),
             penalty: 0,
             steps: 0,
-            p1active: true,
         },
     };
 }
@@ -307,7 +300,6 @@ impl Game {
     // swap the hands when the other player becomes active
     fn swap(&mut self) {
         swap(&mut self.p1hand, &mut self.p2hand);
-        self.p1active ^= true;
     }
 }
 
@@ -384,13 +376,7 @@ fn untrickable(hand: Vec<u8>) -> bool {
     match rev_hand_clone.iter().position(|&x| x != 0) {
         Some(non_zero_position) => {
             let fnz = non_zero_position as usize;
-            // println!(
-            //	"fnz is {:?} and rev_hand_clone is {:?}",
-            //	fnz,
-            //	rev_hand_clone.clone()
-            // );
             let (tail_zeros, pre) = rev_hand_clone.split_at(fnz);
-            // println!("tail_zeros is {:?} and pre is {:?}", tail_zeros, pre);
             return tail_zeros.len() == pre[0] as usize;
         }
         _ => return false,
@@ -875,25 +861,13 @@ mod tests {
 
 // record26sTop h0 h1 = uncurry record26s_alt_disp (nextDeck26s h0 h1)
 fn record_26s_top(hand_one: Vec<u8>, hand_two: Vec<u8>) -> GameState {
-    // println!("{:?} {:?} is inputs for record_26s_top", hand_one.clone(), hand_two.clone()); // THESE REALLY EXIST
     let (hand_one_next, hand_two_next) = next_deck_26s(hand_one, hand_two);
-    // println!("{:?} {:?} is result from for next_deck_26s", hand_one_next.clone(), hand_two_next.clone()); // but these?
-    // println!(
-    //	"record_26s_top {:?} {:?}",
-    //	hand_one_next.clone(),
-    //	hand_two_next.clone()
-    // );
     return record26s_alt_disp(hand_one_next, hand_two_next);
 }
 
 fn record26s_alt_disp(hand_one: Vec<u8>, hand_two: Vec<u8>) -> GameState {
-    // println!("{:?} {:?} is inputs for record26s_alt_disp", hand_one.clone(), hand_two.clone());
     let mut best_game = make_game(hand_one.clone(), hand_two.clone());
-    // println!("{} is best_game", best_game);
     let all_unplays = unplay(hand_one.clone(), hand_two.clone());
-    // let mut more_unplays = unplay(hand_two, hand_one);
-    // all_unplays.append(&mut more_unplays);
-    // println!("all_unplays {:?}", all_unplays);
     let unplay_26 = all_unplays
         .iter()
         .filter(|(h1, h2)| h1.len() == 26 && h2.len() == 26);
@@ -902,13 +876,9 @@ fn record26s_alt_disp(hand_one: Vec<u8>, hand_two: Vec<u8>) -> GameState {
         play_one(&mut g.game); // XXX sort here
         if g.game.steps > best_game.game.steps {
             best_game = g.clone();
-            // println!("{} best temp game", best_game);
         }
     }
-    // println!("{} best unplayed game", best_game.clone());
     return best_game;
-
-    // let matches: Vec<&(Vec<u8>, Vec<u8>)> = unplay(hand_one, hand_two).iter().filter(|(_0, _1)| _0.len() == 26 && _1.len() == 26).collect::<Vec<_>>();
 }
 
 /* nextDeck26s :: [Word8] -> [Word8] -> ([Word8], [Word8])
@@ -917,7 +887,6 @@ nextDeck26s h0 h1 | length h1 >= 52 && length h0 <=0 = (h1, h0)
 nextDeck26s h0 h1 = fastPlayNext26s [] (Player 0 mempty h0) (Player 0 mempty h1) (-1) 0 */
 fn next_deck_26s(hand_one: Vec<u8>, hand_two: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
     // either the game is done and we bail, or we return the next post-trick state that could be normally dealt
-    // println!("{:?} {:?} is inputs for next_deck_26s", hand_one.clone(), hand_two.clone());
     if hand_one.len() >= 52 && hand_two.len() <= 0 {
         return (hand_one, hand_two);
     } else if hand_two.len() >= 52 && hand_one.len() <= 0 {
@@ -929,9 +898,9 @@ fn next_deck_26s(hand_one: Vec<u8>, hand_two: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
 // why only one? why not all of them?
 fn fast_play_next_26s(hand_one: Vec<u8>, hand_two: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
     let mut g = make_game(hand_one, hand_two);
-    let mut deals: Option<(Vec<u8>, Vec<u8>)> = None;
+    let mut deals: Vec<(Vec<u8>, Vec<u8>)> = vec![];
     play_one_check(&mut g.game, &mut deals);
-    return match deals {
+    return match deals.first() {
         Some((h1, h2)) => {
             let (mut h1_ret, mut h2_ret) = (h1.clone(), h2.clone());
             h1_ret.reverse();
@@ -943,11 +912,6 @@ fn fast_play_next_26s(hand_one: Vec<u8>, hand_two: Vec<u8>) -> (Vec<u8>, Vec<u8>
 }
 
 fn unplay(mut hand_one: Vec<u8>, hand_two: Vec<u8>) -> Vec<(Vec<u8>, Vec<u8>)> {
-    // println!(
-    //	"into unplay with {:?} {:?}",
-    //	hand_one.clone(),
-    //	hand_two.clone()
-    // );
     if !(untrickable(hand_one.clone())) && (hand_one.len() < 52) {
         return vec![];
     };
@@ -972,10 +936,6 @@ fn districk(
     losing_hand: Vec<u8>,
     (rtrick, winning_hand): (Vec<u8>, Vec<u8>),
 ) -> (Vec<u8>, Vec<u8>) {
-    // println!(
-    //	"losing_hand {:?} rtrick {:?} winning_hand {:?}",
-    //	losing_hand, rtrick, winning_hand
-    // );
     let (a, b) = districk_go(losing_hand, winning_hand, vec![], rtrick);
     return (b, a);
 }
@@ -986,16 +946,8 @@ fn districk_go(
     mut zeros: Vec<u8>,
     rtrick: Vec<u8>,
 ) -> (Vec<u8>, Vec<u8>) {
-    // println!(
-    //	"other_hand {:?} taking_hand {:?} zeros {:?} rtrick {:?}",
-    //	other_hand, taking_hand, zeros, rtrick
-    // );
     if rtrick.len() == 0 {
         // go oh' th' zs [] = foldr (\c (oh, th) -> (th, c:oh)) (th', oh') zs
-        // println!(
-        //     "starting from th {:?} oh {:?} zeros {:?}",
-        //     taking_hand, other_hand, zeros
-        // );
         return zeros
             .iter()
             .rfold((taking_hand, other_hand), |acc: (Vec<u8>, Vec<u8>), &x| {
@@ -1003,7 +955,6 @@ fn districk_go(
                 let mut new_snd = vec![x];
                 new_snd.append(&mut acc.0.clone());
                 let new_fst = acc.1.clone();
-                // println!("folded is {:?}", (new_fst.clone(), new_snd.clone()));
                 return (new_fst, new_snd);
             });
     }
@@ -1057,7 +1008,6 @@ fn untrick_go(
         return result;
     }
     if b[0] == 0 {
-        // let newtrick_clone = newtrick.clone();
         return untrick_go(fvs, zs + 1, newtrick.0, &mut rhand.to_vec().clone());
     }
     if fvs == 0 && b[0] as usize == zs {
