@@ -20,8 +20,6 @@
 
         devShell = with pkgs; mkShell {
           buildInputs = [ cargo cargo-binutils rustc rustfmt pre-commit rustPackages.clippy rust-analyzer
-                          perf-tools linuxKernel.packages.linux_5_15.perf
-                          valgrind kcachegrind graphviz
                         ];
           RUST_SRC_PATH = rustPlatform.rustLibSrc;
         };

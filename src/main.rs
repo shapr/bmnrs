@@ -1,3 +1,4 @@
+use num_cpus;
 use rand::Rng;
 use std::fmt;
 use std::mem::swap;
@@ -25,10 +26,10 @@ fn main() {
 
     let mut handles = vec![];
 
-    for _i in 1..4 {
+    for _i in 1..=num_cpus::get() {
         let this_chunk = cards.clone();
         let handle = thread::spawn(move || {
-            play_many(this_chunk, 20_000_000);
+            play_many(this_chunk, 100_000_000);
         });
         handles.push(handle)
     }
