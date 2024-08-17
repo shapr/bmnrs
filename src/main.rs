@@ -60,7 +60,7 @@ fn main() {
     }
 }
 
-fn play_many(cards: Vec<u8>, num_games: u64) {
+fn play_many(cards: Vec<u8>, num_games: u64) -> Vec<()> {
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     let mut counter = 0;
     let mut highscore = 0;
